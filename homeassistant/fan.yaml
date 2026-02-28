@@ -1,0 +1,67 @@
+# homeassistant/fan.yaml
+#
+# MQTT fan entity for the DUUX Whisper Flex.
+#
+# ── How to include in HA ──────────────────────────────────────────────────────
+#
+# Place this file at  <ha-config>/mqtt/fan.yaml  and add to configuration.yaml:
+#
+#   mqtt:
+#     fan: !include_dir_merge_list mqtt/
+#
+# OR inline this list item directly under  mqtt: fan:  in configuration.yaml.
+#
+# ── Confirmed from first connection (2026-02-26) ─────────────────────────────
+#
+#   Device  : DUUX Whisper Flex  (firmware 14.3.10)
+#   Auth    : anonymous (no username/password)
+#   online payload  : {"online":true,"connectionType":"mqtt"}
+#   in payload      : {"sub":{"Tune":[{"uid":"...","power":0,"speed":8,...}]}}
+#
+#   power : 0 = off, 1 = on
+#   speed : integer, 1–26 (Whisper Flex 1 range; confirmed idle speed = 8)
+#   mode  : 0 = normal
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+- name: "DUUX Whisper Flex"
+  unique_id: "duux_whisper_flex_e05a1b76ef60"
+  default_entity_id: "fan.duux_whisper_flex"
+
+  # ── Power ───────────────────────────────────────────────────────────────────
+  command_topic: "sensor/e0:5a:1b:76:ef:60/command"
+  payload_on:  "tune set power 1"
+  payload_off: "tune set power 0"
+
+  # ── State (on / off) ────────────────────────────────────────────────────────
+  state_topic: "sensor/e0:5a:1b:76:ef:60/in"
+  state_value_template: >-
+    {% if value_json.sub is defined %}
+      {% if value_json.sub.Tune[0].power | int == 1 %}on{% else %}off{% endif %}
+    {% endif %}
+
+  # ── Speed (percentage → device speed 1–26) ──────────────────────────────────
+  # percentage_command_template receives `value` = HA percentage (1–100).
+  percentage_command_topic: "sensor/e0:5a:1b:76:ef:60/command"
+  percentage_command_template: >-
+    tune set speed {{ [1, (value | int / 100 * 26) | round | int] | max }}
+
+  # percentage_value_template returns 0–100.
+  percentage_state_topic: "sensor/e0:5a:1b:76:ef:60/in"
+  percentage_value_template: >-
+    {% if value_json.sub is defined %}
+      {{ (value_json.sub.Tune[0].speed | int / 26 * 100) | round | int }}
+    {% endif %}
+
+  # ── Availability ────────────────────────────────────────────────────────────
+  # Confirmed payload: {"online":true,"connectionType":"mqtt"}
+  # Using a template to extract the boolean field.
+  availability_topic: "sensor/e0:5a:1b:76:ef:60/online"
+  availability_template: "{{ 'online' if value_json.online else 'offline' }}"
+  payload_available:     "online"
+  payload_not_available: "offline"
+
+  # ── Misc ────────────────────────────────────────────────────────────────────
+  optimistic: false
+  qos: 0
+  retain: false

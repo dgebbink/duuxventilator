@@ -1,0 +1,76 @@
+# homeassistant/configuration.yaml  —  SNIPPET ONLY
+#
+# This is NOT a complete configuration.yaml.
+# Merge the relevant blocks below into your existing HA configuration.yaml.
+#
+# ── Directory layout assumed ─────────────────────────────────────────────────
+#
+#   <ha-config>/
+#   ├── configuration.yaml        ← add the blocks below here
+#   └── mqtt/
+#       └── fan.yaml              ← copy homeassistant/fan.yaml here
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
+
+# ── MQTT broker ──────────────────────────────────────────────────────────────
+#
+# If you already have an `mqtt:` block in configuration.yaml, add only the
+# missing keys — do NOT duplicate the `mqtt:` heading.
+#
+# The broker is the Mosquitto Docker host (plain MQTT, port 1883).
+# The fan connects to Mosquitto via TLS on port 443/8883; Home Assistant
+# connects to the same broker without TLS on the LAN.
+#
+mqtt:
+  broker: 192.168.2.27
+  port: 1883
+  # username: ha_user      # uncomment if your Mosquitto requires auth for HA
+  # password: ha_password
+
+  # Include MQTT fan entities from separate YAML files in the mqtt/ directory.
+  fan: !include_dir_merge_list mqtt/
+
+
+# ── HomeKit Bridge ───────────────────────────────────────────────────────────
+#
+# Enable HomeKit Bridge via the UI:
+#   Settings → Devices & Services → Add Integration → HomeKit Bridge
+#
+# After adding, the fan.duux_streamer entity is automatically included in the
+# bridge and appears in Apple Home as a fan accessory with:
+#   - On / Off
+#   - Speed (rotation speed slider, mapped from HA percentage)
+#
+# Optional: restrict which entities appear in Apple Home.
+# If you don't add the block below, ALL supported entities are bridged.
+#
+homekit:
+  - name: "Home Assistant Bridge"
+    filter:
+      include_entity_globs:
+        - fan.duux_*
+      # Add other entities you want in Apple Home, e.g.:
+      # - light.living_room
+      # - climate.thermostat
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Verification checklist
+# ─────────────────────────────────────────────────────────────────────────────
+#
+# After restarting HA (Developer Tools → YAML → Restart):
+#
+# 1. Check  Settings → Devices & Services → MQTT  — broker should show
+#    "Connected" to 192.168.2.27:1883.
+#
+# 2. Go to  Developer Tools → States  and search for "duux".
+#    You should see  fan.duux_streamer  with state "on" or "off".
+#
+# 3. In Apple Home the fan tile should appear within a few minutes.
+#    If not, check Settings → Devices & Services → HomeKit Bridge → entities.
+#
+# 4. Availability: if the entity shows "Unavailable", the fan's online topic
+#    payload doesn't match payload_available in fan.yaml.  Subscribe to see it:
+#      mosquitto_sub -h 192.168.2.27 -p 1883 -t 'sensor/e0:5a:1b:76:ef:60/online' -v
+#    Then update fan.yaml accordingly and reload MQTT config.
